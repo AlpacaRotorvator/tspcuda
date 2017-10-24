@@ -165,7 +165,7 @@ main (int argc, char **argv)
   long double i, num_iter;
   int num_cities, mode, gendot = 0;
   float **coord, **distance;
-  int *path, *min_path;
+  int *min_path;
   float len = 0, min_len = FLT_MAX;
 
   // Parse command line
@@ -244,12 +244,23 @@ main (int argc, char **argv)
     fprintf(stderr, cudaGetErrorString(cudaResult));
     exit(EXIT_FAILURE);
   }
-  
-  kernel<<<grid, block, block.x * sizeof(float) + block.x * sizeof(int) * num_cities>>> (d_distance, d_rngStates, d_minpaths,  num_cities, num_iter);
+
+  /* Shared memory setup:
+   * - One float for each thread in a block to store the minimum distance computed
+   * - One int array(num cities size) for each thread in a block to store the path with minimum distance
+   * - Another int array for each thread in a block to store the path used in a computation
+   * The last one(and maybe the other two as well) could be moved into global memory if scalability demands it.
+   */
+  kernel<<<grid, block, block.x * sizeof(float) + 2 * block.x * sizeof(int) * num_cities>>> (d_minpaths,d_distance, d_rngStates,  num_cities, num_iter);
 
   //Cleanup device variables
   cudaFree(d_rngStates);
   cudaFree(d_distance);
+
+  cudaFree(d_minpaths);
+
+  //Deprecated serial code here, to be replaced by parallelized code
+  /*
   
   // Simulates n round trips
   if (!mode == 0)
@@ -289,7 +300,9 @@ main (int argc, char **argv)
       gen_graphviz (coord, min_path, num_cities);
   }
 
-  free (min_path);
+  */
+
+  //free (min_path);
   free (coord);
   free (distance);
 
