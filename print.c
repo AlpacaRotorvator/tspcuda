@@ -14,14 +14,14 @@ print_path (float ***distance, int **path, size_t num_city, float len, int mode)
 
   if (mode == 1)
   {
-    for (i = 0; i < num_city; i++)
+    for (i = 0; i < num_city - 1; i++)
       printf ("d[%d][%d]=%.2f, ", (*path)[i], (*path)[i + 1], (*distance)[(*path)[i]][(*path)[i + 1]]);
     printf ("distance=%.2f\n", len);
   }
 
   else if (mode == 2)
   {
-    for (i = 0; i <= num_city; i++)
+    for (i = 0; i < num_city; i++)
       printf ("%4d", (*path)[i]);
     printf ("\t%4.2f\n", len);
   }
@@ -30,7 +30,7 @@ print_path (float ***distance, int **path, size_t num_city, float len, int mode)
   else if (mode == 3)
   {
     printf ("  minimal path     =");
-    for (i = 0; i <= num_city; i++)
+    for (i = 0; i < num_city; i++)
       printf ("%3d", (*path)[i]);
     printf ("\n  minimal distance = %.2f\n", len);
   }
