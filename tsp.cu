@@ -90,30 +90,30 @@ kernel (float *const mindists, int *const minpaths, float *const distance,
   // Sort out shared memory
   extern __shared__ float sdata[];
   float *threadsMinDists = sdata;
-  int *minPathMatrix = (int *) &threadsMinDists[blockDim.x];
-  int *computePathMatrix = (int *) &minPathMatrix[n_cities * blockDim.x];
+  int *pathMatrix = (int *) &threadsMinDists[blockDim.x];
+  int *pathBanks[] = {&pathMatrix[ltid * n_cities], &pathMatrix[n_cities * (ltid + 1)]};
 
   // Sort out local(ie this thread's) variables
   float *curThreadMinDist = &threadsMinDists[ltid];
-  int *curThreadMinPath = &minPathMatrix[ltid * n_cities];
-  int *curThreadCptPath = &computePathMatrix[ltid * n_cities];
+  int minPathBank = 0;
   curandState localState = rngStates[tid];
 
   //Run everything at least once to initialize a sane minimum path
-  create_path (n_cities, curThreadMinPath, localState);
-  *curThreadMinDist =  measure_path (distance, n_cities, curThreadMinPath);
+  create_path (n_cities, pathBanks[1 - minPathBank], localState);
+  *curThreadMinDist =  measure_path (distance, n_cities, pathBanks[1 - minPathBank]);
+  minPathBank = 1 - minPathBank;
 
   float curThreadCptDist = 0;
   for (int i = 1; i < n_iter; i++)
   {
-    create_path (n_cities, curThreadCptPath, localState);
-    curThreadCptDist = measure_path (distance, n_cities, curThreadMinPath);
+    create_path (n_cities, pathBanks[1 - minPathBank], localState);
+    curThreadCptDist = measure_path (distance, n_cities, pathBanks[1- minPathBank]);
 
     if (curThreadCptDist < *curThreadMinDist)
     {
       *curThreadMinDist = curThreadCptDist;
-      // This is not great at all for performance but guess who cares?
-      memcpy (curThreadMinPath, curThreadCptPath, sizeof(int) * n_cities);
+      // Well, I actually do care
+      minPathBank = 1 - minPathBank;
     }
   }
   unsigned int minDistTid = reduce_dists(threadsMinDists);
@@ -121,7 +121,7 @@ kernel (float *const mindists, int *const minpaths, float *const distance,
   if (ltid == minDistTid)
   {
     mindists[bid] = threadsMinDists[0];
-    memcpy(&minpaths[bid * n_cities], curThreadMinPath, sizeof(int) * n_cities);
+    memcpy(&minpaths[bid * n_cities], pathBanks[minPathBank], sizeof(int) * n_cities);
   }
 }
 
