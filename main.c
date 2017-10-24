@@ -9,6 +9,7 @@
 #include "print.h"
 #include "utils.h"
 #include "graphviz.h"
+#include <cuda_runtime.h>
 
 void
 help (void)
@@ -122,6 +123,40 @@ parse_cmdline(int argc, char **argv, long double *num_iter, int *num_cities, flo
   }
 }
 
+void
+setupGPU (unsigned int device, struct cudaDeviceProp *deviceProp, unsigned int *blocksize, unsigned int *gridsize)
+{
+  cudaError_t cudaResult = cudaSuccess;
+  cudaResult = cudaGetDeviceProperties(deviceProp, device);
+
+  if (cudaResult != cudaSuccess)
+  {
+    fprintf (stderr, "Não foi possível obter as propriedades da GPU.\n");
+    fprintf (stderr, cudaGetErrorString(cudaResult));
+    exit (EXIT_FAILURE);
+  }
+
+  cudaResult = cudaSetDevice(device);
+
+  if (cudaResult != cudaSuccess)
+  {
+    fprintf (stderr, "Não foi possível conectar à GPU.\n");
+    fprintf (stderr, cudaGetErrorString(cudaResult));
+    exit (EXIT_FAILURE);
+  }
+
+  if (*blocksize > (unsigned int)deviceProp->maxThreadsDim[0])
+  {
+    fprintf (stderr, "O número de threads por bloco excede as capacidades do dispositivo");
+    exit (EXIT_FAILURE);
+  }
+
+  if (*gridsize > (unsigned int)deviceProp->maxGridSize[0])
+  {
+    fprintf (stderr, "O número de blocos na grid excede as capacidades do dispositivo");
+    exit (EXIT_FAILURE);
+  }
+}
 
 int
 main (int argc, char **argv)
@@ -141,6 +176,52 @@ main (int argc, char **argv)
   // Create distance matrix
   distance_matrix (&coord, &distance, num_cities);
 
+  //Hardcoded device for now
+  unsigned int device = 0;
+  
+  //Block and grid
+  dim3 block;
+  dim3 grid;
+  //Hardcoded for now
+  block.x = 64;
+  grid.x = 64;
+  
+  //Initalize device, perform basic checks
+  struct cudaDeviceProp deviceProp;
+  setupGPU (device, &deviceProp, &block.x, &grid.x);
+
+  //Sadly CUDA doesn't like arrays-of-pointers matrices very much, a flattened distance vector
+  //is thus needed.
+  float *fdistance;
+  distance_vector (&coord, &fdistance, num_cities);
+  
+  //Allocate and copy distance matrix to device
+  float * d_distance;
+  cudaError_t cudaResult = cudaSuccess;
+
+  cudaResult = cudaMalloc( (void **) &d_distance, num_cities * num_cities * sizeof(float));
+
+  if (cudaResult != cudaSuccess)
+  {
+    fprintf(stderr, "Erro: não foi possível alocar memóra na GPU para a matriz de distâncias\n");
+    fprintf(stderr, cudaGetErrorString(cudaResult));
+    exit(EXIT_FAILURE);
+  }
+
+  cudaResult = cudaMemcpy(d_distance, fdistance, num_cities * num_cities * sizeof(float), cudaMemcpyHostToDevice);
+
+  if (cudaResult != cudaSuccess)
+  {
+    fprintf(stderr, "Erro: não foi possível copiar a matriz de distâncias para a GPU.\n");
+    fprintf(stderr, cudaGetErrorString(cudaResult));
+    exit(EXIT_FAILURE);
+  }
+
+  //Free the flattened distance matrix
+  free(fdistance);
+  
+  //kernel<<<grid, block>>> (&d_distance);
+  
   // Simulates n round trips
   if (!mode == 0)
   {
