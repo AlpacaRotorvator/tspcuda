@@ -117,24 +117,11 @@ kernel (float *const mindists, int *const minpaths, float *const distance,
     }
   }
   unsigned int minDistTid = reduce_dists(threadsMinDists);
-  if(ltid == 0)
-  {
-    printf("\n\t%d\n", minDistTid);
-  }
-  
+
   if (ltid == minDistTid)
   {
     mindists[bid] = threadsMinDists[0];
-    if(bid == 2)
-    {
-      printf("\n(%d,%d) here! My distance is %f, and my path:\n\t[", bid, ltid, mindists[bid]);
-      for(int i = 0; i < n_cities - 1; i++)
-      {
-	printf("%d, ", curThreadMinPath[i]);
-      }
-      printf("%d]\n", curThreadMinPath[n_cities - 1]);
-    }
-    memcpy(curThreadMinPath, &minpaths[bid], sizeof(int) * n_cities);
+    memcpy(&minpaths[bid * n_cities], curThreadMinPath, sizeof(int) * n_cities);
   }
 }
 
@@ -150,19 +137,27 @@ reduce_dists(float *const threadsMinDists)
   {
     if (ltid < s)
     {
-      if (threadsMinDists[s] < threadsMinDists[ltid])
+      if (threadsMinDists[ltid + s] < threadsMinDists[ltid])
       {
 	threadsMinDists[ltid] = threadsMinDists[ltid + s];
-	threadsMinDists[ltid + s] = ltid + s;
+	if (s == blockDim.x /2) {
+	  threadsMinDists[ltid + s] = ltid + s;
+	} else {
+	  threadsMinDists[ltid + s] = threadsMinDists[ltid + s + (s << 1)];
+	}
       }
       else {
-	threadsMinDists[ltid + s] = ltid;
+	if (s == blockDim.x /2) {
+	  threadsMinDists[ltid + s] = ltid;
+	} else {
+	  threadsMinDists[ltid + s] = threadsMinDists[ltid + (s << 1)];
+	}
       }
     }
     __syncthreads();
   }
 
-    return threadsMinDists[1];
+  return threadsMinDists[1];
 }
 
 int
