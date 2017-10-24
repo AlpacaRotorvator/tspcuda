@@ -61,16 +61,3 @@ void array_copy(int **src, int **dst, size_t n);
  *  @return The factorial of n
  */
 long double factorial(int n);
-
-
-/** @brief Permutates an array.
- *
- * Copyright (c) 1990 Michael E. Hohmeyer, hohmeyer@icemcfd.com
- * Permission is granted to modify and re-distribute this code in any manner
- * as long as this notice is preserved.  All standard disclaimers apply.
- *       
- *  @param[in]  n Vector size
- *  @param[out] p Vector of n elements 
- *  @return void 
- */
-void randperm(int n, int p[]);

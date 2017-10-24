@@ -57,28 +57,65 @@ initRNG(curandState *const rngStates, const unsigned int seed)
 }
 
 void
-create_path (int num_city, int **coord)
+__device__ create_path (int num_city, int *coord, curandState localState)
 {
-  int i;
-
-  (*coord) = (int *) malloc ((num_city + 1) * sizeof (int));
-
-  randperm (num_city, *coord);
-  (*coord)[num_city] = (*coord)[0];
+  randperm (num_city, coord, localState);
 }
 
 
-float
-measure_path (float ***distance, int num_city, int **path)
+__device__ float
+measure_path (float *distance, int num_city, int *path)
 {
   int i;
   float l = 0;
 
   for (i = 0; i < num_city; i++)
-    l = l + (*distance)[(*path)[i]][(*path)[i + 1]];
+  {
+    int j = path[i];
+    int k = path[i + 1];
+    l = l + distance[j + num_city * k];
+  }
   return l;
 }
 
+__global__ void
+kernel (float *const minpaths, float *const distance, curandState *const rngStates,
+	const int n_cities, const int n_iter)
+{
+  // Determine thread ID
+  unsigned int bid = blockIdx.x;
+  unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+  // Sort out shared memory
+  extern __shared__ float sdata[];
+  float *threadsMinDists = sdata;
+  int *minPathMatrix = (int *) &threadsMinDists[blockDim.x];
+  int *computePathMatrix = (int *) &minPathMatrix[n_cities * blockDim.x];
+
+  // Sort out local(ie this thread's) variables
+  float *curThreadMinDist = &threadsMinDists[tid];
+  int *curThreadMinPath = &minPathMatrix[tid * n_cities];
+  int *curThreadCptPath = &computePathMatrix[tid * n_cities];
+  curandState localState = rngStates[tid];
+
+  //Run everything at least once to initialize a sane minimum path
+  create_path (n_cities, curThreadMinPath, localState);
+  *curThreadMinDist =  measure_path (distance, n_cities, curThreadMinPath);
+
+  float curThreadCptDist = 0;
+  for (int i = 1; i > n_iter; i++)
+  {
+    create_path (n_cities, curThreadCptPath, localState);
+    curThreadCptDist = measure_path (distance, n_cities, curThreadMinPath);
+
+    if (curThreadCptDist < *curThreadMinDist)
+    {
+      *curThreadMinDist = curThreadCptDist;
+      // This is not great at all for performance but guess who cares?
+      memcpy (curThreadMinPath, curThreadCptPath, sizeof(int) * n_cities);
+    }
+  }
+}
 
 int
 read_file (char *file, float ***array)
@@ -115,4 +152,20 @@ read_file (char *file, float ***array)
   fclose (fp);
 
   return nrows;
+}
+
+__device__ void
+randperm (int n, int perm[], curandState localState)
+{
+  int i, j, t;
+
+  for (i = 0; i < n; i++)
+    perm[i] = i;
+  for (i = 0; i < n; i++)
+  {
+    j = curand (&localState) % (n - i) + i;
+    t = perm[j];
+    perm[j] = perm[i];
+    perm[i] = t;
+  }
 }
