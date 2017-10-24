@@ -13,6 +13,7 @@
 #include <float.h>
 #include <stddef.h>
 #include <unistd.h>
+#include <curand_kernel.h>
 
 /** @brief Print command help.
  *
@@ -39,6 +40,14 @@ void distance_matrix (float ***c, float ***d, int n);
  *  @return void
  */
 void distance_vector (float ***c, float **d, int n);
+
+/** @brief Initialize RNG
+ * Taken from CUDA samples 7 MC_EstimatePiInlineP
+ * 
+ * @param[in] rngStates array of RNG states to set up
+ * @param[in] seed RNG seed
+ */
+__global__ void initRNG (curandState * const rngStates, const unsigned int seed);
 
 
 /** @brief Create a hamiltonian cycle aka "path"

@@ -46,6 +46,16 @@ distance_vector (float ***coord, float **distance, int num_city)
   }
 }
 
+__global__ void
+initRNG(curandState *const rngStates, const unsigned int seed)
+{
+    // Determine thread ID
+    unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Initialise the RNG
+    curand_init(seed, tid, 0, &rngStates[tid]);
+}
+
 void
 create_path (int num_city, int **coord)
 {
