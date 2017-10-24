@@ -1,4 +1,4 @@
-TARGET = tsp 
+TARGET = tspcuda
 LIBS = -lm -lcurand
 CC = gcc
 CFLAGS = -g -I. -Wall
