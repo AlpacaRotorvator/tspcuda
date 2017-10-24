@@ -276,19 +276,6 @@ main (int argc, char **argv)
     fprintf(stderr, cudaGetErrorString(cudaResult));
     exit(EXIT_FAILURE);
   }
-
-  // This might not be necessary after all
-  /*
-  int *minpaths = (int *) malloc(grid.x * num_cities * sizeof(int));
-  cudaResult = cudaMemcpy(minpaths, d_minpaths, grid.x * num_cities * sizeof(int), cudaMemcpyDeviceToHost);
-  
-  if (cudaResult != cudaSuccess)
-  {
-    fprintf(stderr, "Erro: não foi possível copiar resultados(caminhos) para o host\n");
-    fprintf(stderr, cudaGetErrorString(cudaResult));
-    exit(EXIT_FAILURE);
-  }
-  */
   
   // Finish reduction on host
   int min_idx = 0;
@@ -304,8 +291,7 @@ main (int argc, char **argv)
 
   min_path = (int *) malloc(num_cities * sizeof(int));
 
-  //I'm not sure if this will work at all, but if it does it'd be great
-  cudaMemcpy(min_path, &d_minpaths[min_idx * num_cities], num_cities * sizeof(int), cudaMemcpyDeviceToHost);
+  cudaResult = cudaMemcpy(min_path, &d_minpaths[min_idx * num_cities], num_cities * sizeof(int), cudaMemcpyDeviceToHost);
   
   if (cudaResult != cudaSuccess)
   {
@@ -317,7 +303,6 @@ main (int argc, char **argv)
   // Clean up device variables
   cudaFree(d_rngStates);
   cudaFree(d_distance);
-
   cudaFree(d_minpaths);
   cudaFree(d_mindists);
 
