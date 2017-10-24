@@ -258,9 +258,10 @@ main (int argc, char **argv)
   
   /* Shared memory setup:
    * - One float for each thread in a block to store the minimum distance computed
-   * - One int array(num cities size) for each thread in a block to store the path with minimum distance
-   * - Another int array for each thread in a block to store the path used in a computation
-   * The last one(and maybe the other two as well) could be moved into global memory if scalability demands it.
+   * - Two num_cities-long int array. Threads alternate between using one for storing
+   *   the best path and the other for storing the next path to be computed. That way
+   *   one is able to avoid the horridly expensive memory copying I was doing earlier
+   *   and possibly obtaing better memory locality in warps.
    */
   kernel<<<grid, block,
     block.x * sizeof(float) + 2 * block.x * sizeof(int) * num_cities>>>
