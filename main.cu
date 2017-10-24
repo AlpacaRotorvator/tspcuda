@@ -289,6 +289,7 @@ main (int argc, char **argv)
       min_idx = i;
     }
   }
+  free(mindists)
 
   min_path = (int *) malloc(num_cities * sizeof(int));
 
@@ -316,49 +317,6 @@ main (int argc, char **argv)
       gen_graphviz (coord, min_path, num_cities);
   }
   
-  // Deprecated serial code here, to be replaced by parallelized code
-  /*
-  
-  // Simulates n round trips
-  if (!mode == 0)
-  {
-    printf ("POSSIBLE PATHS:\n");
-  }
-  for (i = 0; i < num_iter; i++)
-  {
-    create_path (num_cities, &path);
-    len = measure_path (&distance, num_cities, &path);
-
-    // Print path if option 
-    if (!mode == 0)
-    {
-      print_path (&distance, &path, num_cities, len, mode);
-    }
-
-    // Save the path if better 
-    if (len < min_len)
-    {
-      min_len = len;
-      array_copy (&path, &min_path, num_cities);
-    }
-    free (path);
-  }
-
-  if (!mode == 0)
-  {
-    printf ("\n");
-  }
-
-  // Print report 
-  print_repo (coord, distance, min_path, num_cities, min_len, num_iter, mode);
-
-  // Generate dot file
-  if(gendot) {
-      gen_graphviz (coord, min_path, num_cities);
-  }
-
-  */
-
   free (min_path);
   free (coord);
   free (distance);
