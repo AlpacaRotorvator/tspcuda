@@ -28,7 +28,7 @@ distance_matrix (float ***coord, float ***distance, int num_city)
 }
 
 void
-distance_matrix (float ***coord, float **distance, int num_city)
+distance_vector (float ***coord, float **distance, int num_city)
 {
   int i, j, nrows, ncols;
 
@@ -36,12 +36,14 @@ distance_matrix (float ***coord, float **distance, int num_city)
   nrows = num_city;
 
   *distance = (float *) malloc (num_city * num_city  * sizeof (float));
-  for (i = 0; i < nrows; i++)
-    (*distance)[i] = (float *) malloc (ncols * sizeof (float));
 
   for (i = 0; i < num_city; i++)
+  {
     for (j = 0; j < num_city; j++)
-      (*distance)[i][j] = sqrt (pow ((*coord)[i][0] - (*coord)[j][0], 2) + pow ((*coord)[i][1] - (*coord)[j][1], 2));
+    {
+      (*distance)[i + j * num_city] = sqrt (pow ((*coord)[i][0] - (*coord)[j][0], 2) + pow ((*coord)[i][1] - (*coord)[j][1], 2));
+    }
+  }
 }
 
 void
