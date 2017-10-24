@@ -202,7 +202,7 @@ main (int argc, char **argv)
   }
   
   //Initialize RNG
-  //initRNG<<<grid, block>>>(d_rngStates, time (NULL));
+  initRNG<<<grid, block>>>(d_rngStates, time (NULL));
 
   //Sadly CUDA doesn't like arrays-of-pointers matrices very much, flattened coord and
   //distance matrices are thus needed.
@@ -232,8 +232,24 @@ main (int argc, char **argv)
 
   //Free the flattened distance matrix
   free(fdistance);
+
+  //Allocate memory in device for computation results
+  float * d_minpaths;
+
+  cudaResult = cudaMalloc( (void **) &d_minpaths, grid.x * sizeof(float));
+
+  if (cudaResult != cudaSuccess)
+  {
+    fprintf(stderr, "Erro: não foi possível alocar memóra na GPU para os resultados\n");
+    fprintf(stderr, cudaGetErrorString(cudaResult));
+    exit(EXIT_FAILURE);
+  }
   
-  //kernel<<<grid, block>>> (num_iter, &d_distance, num_cities);
+  kernel<<<grid, block, block.x * sizeof(float) + block.x * sizeof(int) * num_cities>>> (d_distance, d_rngStates, d_minpaths,  num_cities, num_iter);
+
+  //Cleanup device variables
+  cudaFree(d_rngStates);
+  cudaFree(d_distance);
   
   // Simulates n round trips
   if (!mode == 0)
