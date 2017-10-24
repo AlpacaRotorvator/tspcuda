@@ -78,8 +78,8 @@ __device__ float measure_path (float *d, int n, int *p);
  *  @param[in] n_cities Number of cities
  *  @param[in] n_iter Number of simulations per thread
  */
-__global__ void kernel (float *const minpaths, float *const distance, curandState *const rngStates,
-			const int n_cities, const int n_iter);
+__global__ void kernel (float *const mindists, int *const minpaths, float *const distance,
+			curandState *const rngStates, const int n_cities, const int n_iter);
 
 
 /** Read cities coordinate file
@@ -106,3 +106,12 @@ int read_file (char *f, float ***m);
  *  @return void 
  */
 __device__ void randperm(int n, int p[], curandState localState);
+
+/** @brief Reduces minimum paths/distances in a block
+ *
+ * Based on the sum-reduction function in CUDA Samples 7 MC_EstimatePiInlineP
+ *
+ *  @param[in] threadsMinDists Pointer to array holding minimum distances for each thread in block.
+ *  @return thread id holding the minimal path
+ */
+__device__ unsigned int reduce_dists(float *const threadsMinDists);

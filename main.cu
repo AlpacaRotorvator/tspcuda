@@ -184,7 +184,7 @@ main (int argc, char **argv)
   dim3 grid;
   //Hardcoded for now
   block.x = 64;
-  grid.x = 64;
+  grid.x = 8;
   
   //Initalize device, perform basic checks
   struct cudaDeviceProp deviceProp;
@@ -234,32 +234,103 @@ main (int argc, char **argv)
   free(fdistance);
 
   //Allocate memory in device for computation results
-  float * d_minpaths;
+  int * d_minpaths;
 
-  cudaResult = cudaMalloc( (void **) &d_minpaths, grid.x * sizeof(float));
+  cudaResult = cudaMalloc( (void **) &d_minpaths, grid.x * num_cities * sizeof(int));
 
   if (cudaResult != cudaSuccess)
   {
-    fprintf(stderr, "Erro: não foi possível alocar memóra na GPU para os resultados\n");
+    fprintf(stderr, "Erro: não foi possível alocar memória na GPU para os resultados(caminhos)\n");
     fprintf(stderr, cudaGetErrorString(cudaResult));
     exit(EXIT_FAILURE);
   }
 
+  float * d_mindists;
+
+  cudaResult = cudaMalloc( (void **) &d_mindists, grid.x * sizeof(float));
+
+  if (cudaResult != cudaSuccess)
+  {
+    fprintf(stderr, "Erro: não foi possível alocar memória na GPU para os resultados(distâncias)\n");
+    fprintf(stderr, cudaGetErrorString(cudaResult));
+    exit(EXIT_FAILURE);
+  }
+  
   /* Shared memory setup:
    * - One float for each thread in a block to store the minimum distance computed
    * - One int array(num cities size) for each thread in a block to store the path with minimum distance
    * - Another int array for each thread in a block to store the path used in a computation
    * The last one(and maybe the other two as well) could be moved into global memory if scalability demands it.
    */
-  kernel<<<grid, block, block.x * sizeof(float) + 2 * block.x * sizeof(int) * num_cities>>> (d_minpaths,d_distance, d_rngStates,  num_cities, num_iter);
+  kernel<<<grid, block,
+    block.x * sizeof(float) + 2 * block.x * sizeof(int) * num_cities>>>
+    (d_mindists, d_minpaths, d_distance, d_rngStates,  num_cities, num_iter);
 
-  //Cleanup device variables
+  // Copy results back to device
+  float *mindists = (float *) malloc(grid.x * sizeof(float));
+  cudaResult = cudaMemcpy(mindists, d_mindists, grid.x * sizeof(float), cudaMemcpyDeviceToHost);
+  
+  if (cudaResult != cudaSuccess)
+  {
+    fprintf(stderr, "Erro: não foi possível copiar resultados(distâncias) para o host\n");
+    fprintf(stderr, cudaGetErrorString(cudaResult));
+    exit(EXIT_FAILURE);
+  }
+
+  // This might not be necessary after all
+  /*
+  int *minpaths = (int *) malloc(grid.x * num_cities * sizeof(int));
+  cudaResult = cudaMemcpy(minpaths, d_minpaths, grid.x * num_cities * sizeof(int), cudaMemcpyDeviceToHost);
+  
+  if (cudaResult != cudaSuccess)
+  {
+    fprintf(stderr, "Erro: não foi possível copiar resultados(caminhos) para o host\n");
+    fprintf(stderr, cudaGetErrorString(cudaResult));
+    exit(EXIT_FAILURE);
+  }
+  */
+  
+  // Finish reduction on host
+  int min_idx = 0;
+  min_len = mindists[0];
+  for (int i = 1; i < grid.x; i++)
+  {
+    if (mindists[i] < min_len)
+    {
+      min_len = mindists[i];
+      min_idx = i;
+    }
+  }
+
+  min_path = (int *) malloc(num_cities * sizeof(int));
+
+  //I'm not sure if this will work at all, but if it does it'd be great
+  cudaMemcpy(min_path, &d_minpaths[min_idx * num_cities], num_cities * sizeof(int), cudaMemcpyDeviceToHost);
+  
+  if (cudaResult != cudaSuccess)
+  {
+    fprintf(stderr, "Erro: não foi possível copiar melhor caminho para o host\n");
+    fprintf(stderr, cudaGetErrorString(cudaResult));
+    exit(EXIT_FAILURE);
+  }
+
+  // Clean up device variables
   cudaFree(d_rngStates);
   cudaFree(d_distance);
 
   cudaFree(d_minpaths);
+  cudaFree(d_mindists);
 
-  //Deprecated serial code here, to be replaced by parallelized code
+
+  // Print report 
+  print_repo (coord, distance, min_path, num_cities, min_len, num_iter, mode);
+
+  // Generate dot file
+  if(gendot) {
+      gen_graphviz (coord, min_path, num_cities);
+  }
+  
+  // Deprecated serial code here, to be replaced by parallelized code
   /*
   
   // Simulates n round trips
@@ -302,7 +373,7 @@ main (int argc, char **argv)
 
   */
 
-  //free (min_path);
+  free (min_path);
   free (coord);
   free (distance);
 

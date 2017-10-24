@@ -56,8 +56,8 @@ initRNG(curandState *const rngStates, const unsigned int seed)
     curand_init(seed, tid, 0, &rngStates[tid]);
 }
 
-void
-__device__ create_path (int num_city, int *coord, curandState localState)
+__device__ void
+create_path (int num_city, int *coord, curandState localState)
 {
   randperm (num_city, coord, localState);
 }
@@ -69,7 +69,7 @@ measure_path (float *distance, int num_city, int *path)
   int i;
   float l = 0;
 
-  for (i = 0; i < num_city; i++)
+  for (i = 0; i < num_city - 1; i++)
   {
     int j = path[i];
     int k = path[i + 1];
@@ -79,12 +79,13 @@ measure_path (float *distance, int num_city, int *path)
 }
 
 __global__ void
-kernel (float *const minpaths, float *const distance, curandState *const rngStates,
-	const int n_cities, const int n_iter)
+kernel (float *const mindists, int *const minpaths, float *const distance,
+	curandState *const rngStates, const int n_cities, const int n_iter)
 {
   // Determine thread ID
   unsigned int bid = blockIdx.x;
   unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
+  unsigned int ltid = threadIdx.x;
 
   // Sort out shared memory
   extern __shared__ float sdata[];
@@ -93,9 +94,9 @@ kernel (float *const minpaths, float *const distance, curandState *const rngStat
   int *computePathMatrix = (int *) &minPathMatrix[n_cities * blockDim.x];
 
   // Sort out local(ie this thread's) variables
-  float *curThreadMinDist = &threadsMinDists[tid];
-  int *curThreadMinPath = &minPathMatrix[tid * n_cities];
-  int *curThreadCptPath = &computePathMatrix[tid * n_cities];
+  float *curThreadMinDist = &threadsMinDists[ltid];
+  int *curThreadMinPath = &minPathMatrix[ltid * n_cities];
+  int *curThreadCptPath = &computePathMatrix[ltid * n_cities];
   curandState localState = rngStates[tid];
 
   //Run everything at least once to initialize a sane minimum path
@@ -103,7 +104,7 @@ kernel (float *const minpaths, float *const distance, curandState *const rngStat
   *curThreadMinDist =  measure_path (distance, n_cities, curThreadMinPath);
 
   float curThreadCptDist = 0;
-  for (int i = 1; i > n_iter; i++)
+  for (int i = 1; i < n_iter; i++)
   {
     create_path (n_cities, curThreadCptPath, localState);
     curThreadCptDist = measure_path (distance, n_cities, curThreadMinPath);
@@ -115,6 +116,53 @@ kernel (float *const minpaths, float *const distance, curandState *const rngStat
       memcpy (curThreadMinPath, curThreadCptPath, sizeof(int) * n_cities);
     }
   }
+  unsigned int minDistTid = reduce_dists(threadsMinDists);
+  if(ltid == 0)
+  {
+    printf("\n\t%d\n", minDistTid);
+  }
+  
+  if (ltid == minDistTid)
+  {
+    mindists[bid] = threadsMinDists[0];
+    if(bid == 2)
+    {
+      printf("\n(%d,%d) here! My distance is %f, and my path:\n\t[", bid, ltid, mindists[bid]);
+      for(int i = 0; i < n_cities - 1; i++)
+      {
+	printf("%d, ", curThreadMinPath[i]);
+      }
+      printf("%d]\n", curThreadMinPath[n_cities - 1]);
+    }
+    memcpy(curThreadMinPath, &minpaths[bid], sizeof(int) * n_cities);
+  }
+}
+
+__device__ unsigned int
+reduce_dists(float *const threadsMinDists)
+{
+  unsigned int ltid = threadIdx.x;
+  
+  __syncthreads();
+  
+  // Do reduction in shared mem
+  for (unsigned int s = blockDim.x / 2 ; s > 0 ; s >>= 1)
+  {
+    if (ltid < s)
+    {
+      if (threadsMinDists[s] < threadsMinDists[ltid])
+      {
+	threadsMinDists[ltid] = threadsMinDists[ltid + s];
+	threadsMinDists[ltid + s] = ltid + s;
+      }
+      else {
+	threadsMinDists[ltid + s] = ltid;
+      }
+    }
+    __syncthreads();
+  }
+
+    return threadsMinDists[1];
 }
 
 int
@@ -160,7 +208,9 @@ randperm (int n, int perm[], curandState localState)
   int i, j, t;
 
   for (i = 0; i < n; i++)
+  {
     perm[i] = i;
+  }
   for (i = 0; i < n; i++)
   {
     j = curand (&localState) % (n - i) + i;
