@@ -46,6 +46,7 @@ void distance_vector (float ***c, float **d, int n);
  * 
  * @param[in] rngStates array of RNG states to set up
  * @param[in] seed RNG seed
+ * @return void
  */
 __global__ void initRNG (curandState * const rngStates, const unsigned int seed);
 
