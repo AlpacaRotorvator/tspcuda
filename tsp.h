@@ -31,6 +31,15 @@ void help (void);
  */
 void distance_matrix (float ***c, float ***d, int n);
 
+/** @brief Create euclidian distance matrix in flattened form
+ *
+ *  @param[in]  c Coordinates matrix
+ *  @param[out] d Distance matrix
+ *  @param[in]  n Number of cities 
+ *  @return void
+ */
+void distance_vector (float ***c, float **d, int n);
+
 
 /** @brief Create a hamiltonian cycle aka "path"
  *
