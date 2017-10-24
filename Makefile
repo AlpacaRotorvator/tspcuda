@@ -1,6 +1,6 @@
 TARGET = tspcuda
 LIBS = -lm -lcurand
-CC = gcc
+CC = g++
 CFLAGS = -g -I. -Wall
 
 NVCC := nvcc -ccbin $(CC)
@@ -19,10 +19,11 @@ INCLUDES  := -I /opt/cuda/samples/common/inc
 default: $(TARGET)
 all: default
 
-OBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
+OBJECTS = $(patsubst %.cu, %.o, $(wildcard *.cu))
+OBJECTS += $(patsubst %.c, %.o, $(wildcard *.c)) 
 HEADERS = $(wildcard *.h)
 
-%.o: %.c $(HEADERS)
+%.o: %.cu
 		$(NVCC) $(INCLUDES) $(ALL_CFLAGS) -c $< -o $@
 
 .PRECIOUS: $(TARGET) $(OBJECTS)

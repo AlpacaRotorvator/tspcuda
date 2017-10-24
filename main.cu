@@ -10,6 +10,7 @@
 #include "utils.h"
 #include "graphviz.h"
 #include <cuda_runtime.h>
+#include <curand_kernel.h>
 
 void
 help (void)
@@ -170,14 +171,13 @@ main (int argc, char **argv)
   // Parse command line
   parse_cmdline(argc, argv, &num_iter, &num_cities, &coord, &mode, &gendot);
  
-  // Create a new seed
-  srand (time (NULL));
 
   // Create distance matrix
   distance_matrix (&coord, &distance, num_cities);
 
   //Hardcoded device for now
   unsigned int device = 0;
+  cudaError_t cudaResult = cudaSuccess;
   
   //Block and grid
   dim3 block;
@@ -190,14 +190,27 @@ main (int argc, char **argv)
   struct cudaDeviceProp deviceProp;
   setupGPU (device, &deviceProp, &block.x, &grid.x);
 
-  //Sadly CUDA doesn't like arrays-of-pointers matrices very much, a flattened distance vector
-  //is thus needed.
+  // Allocate memory for RNG states
+  curandState *d_rngStates = 0;
+  cudaResult = cudaMalloc((void **)&d_rngStates, grid.x * block.x * sizeof(curandState));
+
+  if (cudaResult != cudaSuccess)
+  {
+    fprintf(stderr, "Erro: não foi possível alocar memóra na GPU para os estados do RNG\n");
+    fprintf(stderr, cudaGetErrorString(cudaResult));
+    exit(EXIT_FAILURE);
+  }
+  
+  //Initialize RNG
+  //initRNG<<<grid, block>>>(d_rngStates, time (NULL));
+
+  //Sadly CUDA doesn't like arrays-of-pointers matrices very much, flattened coord and
+  //distance matrices are thus needed.
   float *fdistance;
   distance_vector (&coord, &fdistance, num_cities);
   
   //Allocate and copy distance matrix to device
   float * d_distance;
-  cudaError_t cudaResult = cudaSuccess;
 
   cudaResult = cudaMalloc( (void **) &d_distance, num_cities * num_cities * sizeof(float));
 
@@ -220,7 +233,7 @@ main (int argc, char **argv)
   //Free the flattened distance matrix
   free(fdistance);
   
-  //kernel<<<grid, block>>> (&d_distance);
+  //kernel<<<grid, block>>> (num_iter, &d_distance, num_cities);
   
   // Simulates n round trips
   if (!mode == 0)
