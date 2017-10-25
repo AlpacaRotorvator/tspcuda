@@ -70,7 +70,7 @@ print_cord (float ***coord, size_t num_city)
 
 
 void
-print_repo (float **coord, float **distance, int *min_path, int num_city, float min_len, long double inter, int mode)
+print_repo (float **coord, float **distance, int *min_path, int num_city, float min_len, long double inter, int mode, int grid, int block)
 {
   // Print cities coordinates
   print_cord (&coord, num_city);
@@ -78,11 +78,16 @@ print_repo (float **coord, float **distance, int *min_path, int num_city, float 
   // Print distance matrix
   print_dist (&distance, num_city);
 
+  // Device info
+  printf("DEVICE INFO:\n");
+  printf("  Block size        = %d\n", block);
+  printf("  Grid size         = %d\n\n", grid);
+
   // Print results
   printf ("RESULTS:\n");
   printf ("  number of cities = %d\n", num_city);
   printf ("  possible paths   = %.0Lf\n", factorial (num_city - 1) / 2);
-  printf ("  simulated paths  = %.0Lf\n", inter);
+  printf ("  simulated paths  = %.0Lf\n", inter * grid * block);
 
   // Print minimal path found
   print_path (&distance, &min_path, num_city, min_len, 3);

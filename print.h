@@ -43,6 +43,8 @@ void print_cord(float ***c, size_t n);
  *  @param[in] ml Minimal length 
  *  @param[in] i  Number of simulations
  *  @param[in] pm Print mode
+ *  @param[in] grid Number of blocks in the grid
+ *  @param[in] block Number of threads in a block
  *  @return void 
  */
-void print_repo(float **c, float **d, int *m, int n, float ml, long double i, int pm);
+void print_repo(float **c, float **d, int *m, int n, float ml, long double i, int pm, int grid, int block);

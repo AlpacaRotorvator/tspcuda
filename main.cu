@@ -336,7 +336,7 @@ main (int argc, char **argv)
 
 
   // Print report 
-  print_repo (coord, distance, min_path, num_cities, min_len, num_iter, mode);
+  print_repo (coord, distance, min_path, num_cities, min_len, num_iter, mode, grid.x, block.x);
 
   // Generate dot file
   if(gendot) {
