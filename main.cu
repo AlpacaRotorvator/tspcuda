@@ -21,7 +21,7 @@ help (void)
   printf ("  -n <ITER>    Number of paths to simulate per thread\n");
   printf ("  -m <MODE>    Exibition mode 0, 1 or 2 (silent = 0)\n");
   printf ("  -b <BNUM>    Number of blocks in the grid\n");
-  printf ("  -t <TNUM>    Number of threads per block\n");
+  printf ("  -t <TNUM>    Number of threads per block(must be power of two)\n");
   printf ("  -f <FILE>    Cities coordinates file\n");
   printf ("  -g           Generate city coordinates + shortest path graph in graphviz's dot format\n");
   printf ("  -h           Show this help message and exit\n\n");
@@ -31,7 +31,7 @@ help (void)
 
 
 int
-parse_cmdline(int argc, char **argv, long double *num_iter, int *num_cities, float ***coord, int *mode, int *gendot)
+parse_cmdline(int argc, char **argv, long double *num_iter, int *num_cities, float ***coord, int *mode, int *gendot, int *threadsPerBlock, int *numBlocks)
 {
   char c;
   long double i;
@@ -42,7 +42,7 @@ parse_cmdline(int argc, char **argv, long double *num_iter, int *num_cities, flo
 
   // Read and parse command line arguments
   opterr = 0;
-  while ((c = getopt (argc, argv, "n:m:f:gh::")) != -1)
+  while ((c = getopt (argc, argv, "n:m:f:b:t:gh::")) != -1)
     switch (c)
     {
     case 'n':
@@ -93,6 +93,30 @@ parse_cmdline(int argc, char **argv, long double *num_iter, int *num_cities, flo
       gflag = 1;
       *gendot = 1;
       break;
+    case 't':
+      tflag = 1;
+      if (!is_integer (optarg))
+      {
+        fprintf (stderr, "%s: error: number of threads per block must be an integer and power of two\n", argv[0]);
+        exit (EXIT_FAILURE);
+      }
+      else
+      {
+        *threadsPerBlock = strtold (optarg, NULL);
+      }
+      break;
+    case 'b':
+      bflag = 1;
+      if (!is_integer (optarg))
+      {
+        fprintf (stderr, "%s: error: number of blocks in the grid must be an integer\n", argv[0]);
+        exit (EXIT_FAILURE);
+      }
+      else
+      {
+	*numBlocks = strtold (optarg, NULL);
+      }
+      break;
     case 'h':
       help ();
       exit (EXIT_SUCCESS);
@@ -101,7 +125,7 @@ parse_cmdline(int argc, char **argv, long double *num_iter, int *num_cities, flo
       fprintf (stderr, "%s: error: invalid option\n", argv[0]);
       return 1;
     default:
-      fprintf (stderr, "usage: tsp [-h] [-g] [-n <ITER>] -m <MODE> -f <FILE>\n");
+      fprintf (stderr, "usage: tsp [-h] [-g] [-n <ITER>] -b <BNUM> -t <TNUM> -m <MODE> -f <FILE>\n");
       abort ();
     }
 
@@ -121,7 +145,7 @@ parse_cmdline(int argc, char **argv, long double *num_iter, int *num_cities, flo
   if (nflag == 0 || mflag == 0 || fflag == 0)
   {
     fprintf (stderr, "%s: error: too few parameters\n", argv[0]);
-    fprintf (stderr, "usage: tsp [-h] [-n <ITER>] -m <MODE> -f <FILE>\n");
+    fprintf (stderr, "usage: tsp [-h] [-n <ITER>] -b <BNUM> -t <TNUM> -m <MODE> -f <FILE>\n");
     exit (EXIT_FAILURE);
   }
 }
@@ -165,13 +189,13 @@ int
 main (int argc, char **argv)
 {
   long double i, num_iter;
-  int num_cities, mode, gendot = 0;
+  int num_cities, mode, gendot = 0, threadsPerBlock = 256, numBlocks = 32;
   float **coord, **distance;
   int *min_path;
   float len = 0, min_len = FLT_MAX;
 
   // Parse command line
-  parse_cmdline(argc, argv, &num_iter, &num_cities, &coord, &mode, &gendot);
+  parse_cmdline(argc, argv, &num_iter, &num_cities, &coord, &mode, &gendot, &threadsPerBlock, &numBlocks);
  
 
   // Create distance matrix
@@ -185,8 +209,8 @@ main (int argc, char **argv)
   dim3 block;
   dim3 grid;
   //Hardcoded for now
-  block.x = 64;
-  grid.x = 8;
+  block.x = threadsPerBlock;
+  grid.x = numBlocks;
   
   //Initalize device, perform basic checks
   struct cudaDeviceProp deviceProp;
@@ -291,7 +315,7 @@ main (int argc, char **argv)
       min_idx = i;
     }
   }
-  free(mindists)
+  free(mindists);
 
   min_path = (int *) malloc(num_cities * sizeof(int));
 
