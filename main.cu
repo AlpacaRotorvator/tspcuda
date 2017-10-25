@@ -15,10 +15,10 @@
 void
 help (void)
 {
-  printf ("usage: tsp [-h] [-g] [-n <ITER>] -m <MODE> -f <FILE>\n");
+  printf ("usage: tsp [-h] [-g] [-n <ITER>] -m <MODE> -b <BLKNUM> -t <TRDNUM> -f <FILE>\n");
   printf ("Find best path to Traveling Salesman Problem using Monte Carlo Method\n\n");
   printf ("Options:\n");
-  printf ("  -n <ITER>    Number of paths to simulate\n");
+  printf ("  -n <ITER>    Number of paths to simulate per thread\n");
   printf ("  -m <MODE>    Exibition mode 0, 1 or 2 (silent = 0)\n");
   printf ("  -f <FILE>    Cities coordinates file\n");
   printf ("  -g           Generate city coordinates + shortest path graph in graphviz's dot format\n");
