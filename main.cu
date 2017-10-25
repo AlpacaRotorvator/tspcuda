@@ -15,16 +15,18 @@
 void
 help (void)
 {
-  printf ("usage: tsp [-h] [-g] [-n <ITER>] -m <MODE> -b <BLKNUM> -t <TRDNUM> -f <FILE>\n");
+  printf ("usage: tsp [-h] [-g] [-n <ITER>] -m <MODE> -b <BNUM> -t <TNUM> -f <FILE>\n");
   printf ("Find best path to Traveling Salesman Problem using Monte Carlo Method\n\n");
   printf ("Options:\n");
   printf ("  -n <ITER>    Number of paths to simulate per thread\n");
   printf ("  -m <MODE>    Exibition mode 0, 1 or 2 (silent = 0)\n");
+  printf ("  -b <BNUM>    Number of blocks in the grid\n");
+  printf ("  -t <TNUM>    Number of threads per block\n");
   printf ("  -f <FILE>    Cities coordinates file\n");
   printf ("  -g           Generate city coordinates + shortest path graph in graphviz's dot format\n");
   printf ("  -h           Show this help message and exit\n\n");
   printf ("Example:\n");
-  printf ("  tsp -n 5 -m 0 -f data/grid04_xy.txt   # Simulates 5 paths for 4 cities data file\n");
+  printf ("  tspcuda -b 64 -t 256 -n 2000 -m 0 -f data/grid15_xy.txt   # Using 64 blocks of 256 threads, simulate 2000 paths in each thread for 15 cities data file\n");
 }
 
 
@@ -33,7 +35,7 @@ parse_cmdline(int argc, char **argv, long double *num_iter, int *num_cities, flo
 {
   char c;
   long double i;
-  int nflag = 0, mflag = 0, fflag = 0, gflag = 0;
+  int nflag = 0, mflag = 0, fflag = 0, gflag = 0, bflag = 0, tflag = 0;
   float len = 0, min_len = FLT_MAX;
   FILE *file;
 
