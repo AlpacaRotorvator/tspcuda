@@ -1,7 +1,7 @@
 TARGET = tspcuda
 LIBS = -lm -lcurand
 CC = g++
-CFLAGS = -g -I. -Wall
+CFLAGS = -I. -Wall
 
 NVCC := nvcc -ccbin $(CC)
 NVCCFLAGS := -m64
