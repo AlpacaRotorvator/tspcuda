@@ -11,6 +11,7 @@
 #include "graphviz.h"
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
+#include <helper_timer.h>
 
 void
 help (void)
@@ -211,7 +212,11 @@ main (int argc, char **argv)
   //Hardcoded for now
   block.x = threadsPerBlock;
   grid.x = numBlocks;
-  
+
+
+  StopWatchInterface *timer = NULL;
+  sdkCreateTimer(&timer);
+  sdkStartTimer(&timer);
   //Initalize device, perform basic checks
   struct cudaDeviceProp deviceProp;
   setupGPU (device, &deviceProp, &block.x, &grid.x);
@@ -333,10 +338,13 @@ main (int argc, char **argv)
   cudaFree(d_distance);
   cudaFree(d_minpaths);
   cudaFree(d_mindists);
+  sdkStopTimer(&timer);
+  float elapsedTime = sdkGetAverageTimerValue(&timer)/1000.0f;
 
 
   // Print report 
-  print_repo (coord, distance, min_path, num_cities, min_len, num_iter, mode, grid.x, block.x);
+  print_repo (coord, distance, min_path, num_cities, min_len, num_iter, mode, grid.x, block.x,
+	      elapsedTime);
 
   // Generate dot file
   if(gendot) {

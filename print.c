@@ -70,7 +70,7 @@ print_cord (float ***coord, size_t num_city)
 
 
 void
-print_repo (float **coord, float **distance, int *min_path, int num_city, float min_len, long double inter, int mode, int grid, int block)
+print_repo (float **coord, float **distance, int *min_path, int num_city, float min_len, long double inter, int mode, int grid, int block, float elapsedTime)
 {
   // Print cities coordinates
   print_cord (&coord, num_city);
@@ -88,6 +88,7 @@ print_repo (float **coord, float **distance, int *min_path, int num_city, float 
   printf ("  number of cities = %d\n", num_city);
   printf ("  possible paths   = %.0Lf\n", factorial (num_city - 1) / 2);
   printf ("  simulated paths  = %.0Lf\n", inter * grid * block);
+  printf ("  time taken       = %.3fs\n", elapsedTime);
 
   // Print minimal path found
   print_path (&distance, &min_path, num_city, min_len, 3);

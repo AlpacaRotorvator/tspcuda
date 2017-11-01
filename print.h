@@ -45,6 +45,8 @@ void print_cord(float ***c, size_t n);
  *  @param[in] pm Print mode
  *  @param[in] grid Number of blocks in the grid
  *  @param[in] block Number of threads in a block
+ *  @param[in] elapsedTime Time taken to setup and execute the GPU computations.
  *  @return void 
  */
-void print_repo(float **c, float **d, int *m, int n, float ml, long double i, int pm, int grid, int block);
+void print_repo(float **c, float **d, int *m, int n, float ml, long double i, int pm, int grid,
+		int block, float elapsedTime);
