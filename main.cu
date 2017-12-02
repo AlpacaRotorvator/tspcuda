@@ -25,6 +25,7 @@ help (void)
   printf ("  -t <TNUM>    Number of threads per block(must be power of two)\n");
   printf ("  -f <FILE>    Cities coordinates file\n");
   printf ("  -g           Generate city coordinates + shortest path graph in graphviz's dot format\n");
+  printf ("  -s <SEED>    Seed for RNG, time(NULL) by default\n");
   printf ("  -h           Show this help message and exit\n\n");
   printf ("Example:\n");
   printf ("  tspcuda -b 64 -t 256 -n 2000 -m 0 -f data/grid15_xy.txt   # Using 64 blocks of 256 threads, simulate 2000 paths in each thread for 15 cities data file\n");
@@ -32,18 +33,19 @@ help (void)
 
 
 int
-parse_cmdline(int argc, char **argv, long double *num_iter, int *num_cities, float ***coord, int *mode, int *gendot, int *threadsPerBlock, int *numBlocks)
+parse_cmdline(int argc, char **argv, long double *num_iter, int *num_cities, float ***coord, int *mode, int *gendot,
+	      int *threadsPerBlock, int *numBlocks, unsigned int *seed)
 {
   char c;
   long double i;
-  int nflag = 0, mflag = 0, fflag = 0, gflag = 0, bflag = 0, tflag = 0;
+  int nflag = 0, mflag = 0, fflag = 0, gflag = 0, bflag = 0, tflag = 0, sflag = 0;
   float len = 0, min_len = FLT_MAX;
   FILE *file;
 
 
   // Read and parse command line arguments
   opterr = 0;
-  while ((c = getopt (argc, argv, "n:m:f:b:t:gh::")) != -1)
+  while ((c = getopt (argc, argv, "n:m:f:b:t:s:gh::")) != -1)
     switch (c)
     {
     case 'n':
@@ -118,6 +120,18 @@ parse_cmdline(int argc, char **argv, long double *num_iter, int *num_cities, flo
 	*numBlocks = strtold (optarg, NULL);
       }
       break;
+    case 's':
+	sflag = 1;
+	if(!is_integer (optarg))
+	{
+	  fprintf (stderr, "%s: error: rng seed must be an integer\n", argv[0]);
+	  exit(EXIT_FAILURE);
+	}
+	else
+	{
+	  *seed = strtold (optarg, NULL);
+	}
+	break;	
     case 'h':
       help ();
       exit (EXIT_SUCCESS);
@@ -194,9 +208,10 @@ main (int argc, char **argv)
   float **coord, **distance;
   int *min_path;
   float len = 0, min_len = FLT_MAX;
+  unsigned int rngSeed = time(NULL);
 
   // Parse command line
-  parse_cmdline(argc, argv, &num_iter, &num_cities, &coord, &mode, &gendot, &threadsPerBlock, &numBlocks);
+  parse_cmdline(argc, argv, &num_iter, &num_cities, &coord, &mode, &gendot, &threadsPerBlock, &numBlocks, &rngSeed);
  
 
   // Create distance matrix
@@ -233,8 +248,8 @@ main (int argc, char **argv)
   }
   
   //Initialize RNG
-  initRNG<<<grid, block>>>(d_rngStates, time (NULL));
-
+  initRNG<<<grid, block>>>(d_rngStates, rngSeed);
+  
   //Sadly CUDA doesn't like arrays-of-pointers matrices very much, flattened coord and
   //distance matrices are thus needed.
   float *fdistance;
