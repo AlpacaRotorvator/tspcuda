@@ -7,7 +7,7 @@
 
 #include "tsp.h"
 #include "print.h"
-#include "utils.h"
+#include "utils.hu"
 #include "graphviz.h"
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
@@ -168,24 +168,11 @@ parse_cmdline(int argc, char **argv, long double *num_iter, int *num_cities, flo
 void
 setupGPU (unsigned int device, struct cudaDeviceProp *deviceProp, unsigned int *blocksize, unsigned int *gridsize)
 {
-  cudaError_t cudaResult = cudaSuccess;
-  cudaResult = cudaGetDeviceProperties(deviceProp, device);
+    
+  handleCudaErrors (cudaGetDeviceProperties(deviceProp, device));
 
-  if (cudaResult != cudaSuccess)
-  {
-    fprintf (stderr, "Não foi possível obter as propriedades da GPU.\n");
-    fprintf (stderr, cudaGetErrorString(cudaResult));
-    exit (EXIT_FAILURE);
-  }
 
-  cudaResult = cudaSetDevice(device);
-
-  if (cudaResult != cudaSuccess)
-  {
-    fprintf (stderr, "Não foi possível conectar à GPU.\n");
-    fprintf (stderr, cudaGetErrorString(cudaResult));
-    exit (EXIT_FAILURE);
-  }
+  handleCudaErrors (cudaSetDevice(device));
 
   if (*blocksize > (unsigned int)deviceProp->maxThreadsDim[0])
   {
@@ -219,7 +206,6 @@ main (int argc, char **argv)
 
   //Hardcoded device for now
   unsigned int device = 0;
-  cudaError_t cudaResult = cudaSuccess;
   
   //Block and grid
   dim3 block;
@@ -238,14 +224,8 @@ main (int argc, char **argv)
 
   // Allocate memory for RNG states
   curandState *d_rngStates = 0;
-  cudaResult = cudaMalloc((void **)&d_rngStates, grid.x * block.x * sizeof(curandState));
+  handleCudaErrors (cudaMalloc((void **)&d_rngStates, grid.x * block.x * sizeof(curandState)));
 
-  if (cudaResult != cudaSuccess)
-  {
-    fprintf(stderr, "Erro: não foi possível alocar memóra na GPU para os estados do RNG\n");
-    fprintf(stderr, cudaGetErrorString(cudaResult));
-    exit(EXIT_FAILURE);
-  }
   
   //Initialize RNG
   initRNG<<<grid, block>>>(d_rngStates, rngSeed);
@@ -258,49 +238,22 @@ main (int argc, char **argv)
   //Allocate and copy distance matrix to device
   float * d_distance;
 
-  cudaResult = cudaMalloc( (void **) &d_distance, num_cities * num_cities * sizeof(float));
+  handleCudaErrors (cudaMalloc( (void **) &d_distance, num_cities * num_cities * sizeof(float)));
 
-  if (cudaResult != cudaSuccess)
-  {
-    fprintf(stderr, "Erro: não foi possível alocar memóra na GPU para a matriz de distâncias\n");
-    fprintf(stderr, cudaGetErrorString(cudaResult));
-    exit(EXIT_FAILURE);
-  }
+  handleCudaErrors (cudaMemcpy(d_distance, fdistance, num_cities * num_cities * sizeof(float)
+			       , cudaMemcpyHostToDevice));
 
-  cudaResult = cudaMemcpy(d_distance, fdistance, num_cities * num_cities * sizeof(float), cudaMemcpyHostToDevice);
-
-  if (cudaResult != cudaSuccess)
-  {
-    fprintf(stderr, "Erro: não foi possível copiar a matriz de distâncias para a GPU.\n");
-    fprintf(stderr, cudaGetErrorString(cudaResult));
-    exit(EXIT_FAILURE);
-  }
-
-  //Free the flattened distance matrix
+  //Free the host-side flattened distance matrix
   free(fdistance);
 
   //Allocate memory in device for computation results
   int * d_minpaths;
 
-  cudaResult = cudaMalloc( (void **) &d_minpaths, grid.x * num_cities * sizeof(int));
-
-  if (cudaResult != cudaSuccess)
-  {
-    fprintf(stderr, "Erro: não foi possível alocar memória na GPU para os resultados(caminhos)\n");
-    fprintf(stderr, cudaGetErrorString(cudaResult));
-    exit(EXIT_FAILURE);
-  }
+  handleCudaErrors (cudaMalloc( (void **) &d_minpaths, grid.x * num_cities * sizeof(int)));
 
   float * d_mindists;
 
-  cudaResult = cudaMalloc( (void **) &d_mindists, grid.x * sizeof(float));
-
-  if (cudaResult != cudaSuccess)
-  {
-    fprintf(stderr, "Erro: não foi possível alocar memória na GPU para os resultados(distâncias)\n");
-    fprintf(stderr, cudaGetErrorString(cudaResult));
-    exit(EXIT_FAILURE);
-  }
+  handleCudaErrors (cudaMalloc( (void **) &d_mindists, grid.x * sizeof(float)));
   
   /* Shared memory setup:
    * - One float for each thread in a block to store the minimum distance computed
@@ -315,14 +268,8 @@ main (int argc, char **argv)
 
   // Copy results back to device
   float *mindists = (float *) malloc(grid.x * sizeof(float));
-  cudaResult = cudaMemcpy(mindists, d_mindists, grid.x * sizeof(float), cudaMemcpyDeviceToHost);
-  
-  if (cudaResult != cudaSuccess)
-  {
-    fprintf(stderr, "Erro: não foi possível copiar resultados(distâncias) para o host\n");
-    fprintf(stderr, cudaGetErrorString(cudaResult));
-    exit(EXIT_FAILURE);
-  }
+  handleCudaErrors (cudaMemcpy(mindists, d_mindists,
+			       grid.x * sizeof(float), cudaMemcpyDeviceToHost));
   
   // Finish reduction on host
   int min_idx = 0;
@@ -339,14 +286,8 @@ main (int argc, char **argv)
 
   min_path = (int *) malloc(num_cities * sizeof(int));
 
-  cudaResult = cudaMemcpy(min_path, &d_minpaths[min_idx * num_cities], num_cities * sizeof(int), cudaMemcpyDeviceToHost);
-  
-  if (cudaResult != cudaSuccess)
-  {
-    fprintf(stderr, "Erro: não foi possível copiar melhor caminho para o host\n");
-    fprintf(stderr, cudaGetErrorString(cudaResult));
-    exit(EXIT_FAILURE);
-  }
+  handleCudaErrors (cudaMemcpy(min_path, &d_minpaths[min_idx * num_cities],
+			       num_cities * sizeof(int), cudaMemcpyDeviceToHost));
 
   // Clean up device variables
   cudaFree(d_rngStates);

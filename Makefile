@@ -4,7 +4,7 @@ CC = g++
 CFLAGS = -I. -Wall
 
 NVCC := nvcc -ccbin $(CC)
-NVCCFLAGS := -m64
+NVCCFLAGS := -m64 -std=c++11
 
 ALL_CFLAGS := $(NVCCFLAGS)
 ALL_CFLAGS += $(addprefix -Xcompiler ,$(CFLAGS))
