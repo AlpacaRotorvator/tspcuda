@@ -75,6 +75,8 @@ measure_path (float *distance, int num_city, int *path)
     int k = path[i + 1];
     l = l + distance[j + num_city * k];
   }
+  l+= distance[path[0] + num_city * path[num_city - 1]];
+  
   return l;
 }
 

@@ -7,7 +7,7 @@
 
 #include "tsp.h"
 #include "print.h"
-#include "utils.hu"
+#include "utils.h"
 #include "graphviz.h"
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
@@ -260,7 +260,7 @@ main (int argc, char **argv)
    * - Two num_cities-long int array. Threads alternate between using one for storing
    *   the best path and the other for storing the next path to be computed. That way
    *   one is able to avoid the horridly expensive memory copying I was doing earlier
-   *   and possibly obtaing better memory locality in warps.
+   *   and possibly obtain better memory locality in warps.
    */
   kernel<<<grid, block,
     block.x * sizeof(float) + 2 * block.x * sizeof(int) * num_cities>>>
@@ -295,6 +295,7 @@ main (int argc, char **argv)
   cudaFree(d_minpaths);
   cudaFree(d_mindists);
   sdkStopTimer(&timer);
+  
   float elapsedTime = sdkGetAverageTimerValue(&timer)/1000.0f;
 
 
