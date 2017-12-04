@@ -93,7 +93,8 @@ kernel (float *const mindists, int *const minpaths, float *const distance,
   extern __shared__ float sdata[];
   float *threadsMinDists = sdata;
   int *pathMatrix = (int *) &threadsMinDists[blockDim.x];
-  int *pathBanks[] = {&pathMatrix[ltid * n_cities], &pathMatrix[n_cities * (ltid + 1)]};
+  int *pathBanks[] = {&pathMatrix[2 * ltid * n_cities],
+		      &pathMatrix[n_cities * (2 * ltid + 1)]};
 
   // Sort out local(ie this thread's) variables
   float *curThreadMinDist = &threadsMinDists[ltid];
