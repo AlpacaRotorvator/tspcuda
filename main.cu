@@ -16,11 +16,12 @@
 void
 help (void)
 {
-  printf ("usage: tsp [-h] [-g] [-n <ITER>] -m <MODE> -b <BNUM> -t <TNUM> -f <FILE>\n");
+  printf ("usage: tsp [-h] [-g] -n <ITER> [-m <MODE>] [-b <BNUM>] [-t <TNUM>] [-d <DEVN>] -f <FILE>\n");
   printf ("Find best path to Traveling Salesman Problem using Monte Carlo Method\n\n");
   printf ("Options:\n");
   printf ("  -n <ITER>    Number of paths to simulate per thread\n");
   printf ("  -m <MODE>    Exibition mode 0, 1 or 2 (silent = 0)\n");
+  printf ("  -d <DEVN>    Number of the device to be used\n");
   printf ("  -b <BNUM>    Number of blocks in the grid\n");
   printf ("  -t <TNUM>    Number of threads per block(must be power of two)\n");
   printf ("  -f <FILE>    Cities coordinates file\n");
@@ -31,21 +32,23 @@ help (void)
   printf ("  tspcuda -b 64 -t 256 -n 2000 -m 0 -f data/grid15_xy.txt   # Using 64 blocks of 256 threads, simulate 2000 paths in each thread for 15 cities data file\n");
 }
 
-
 int
-parse_cmdline(int argc, char **argv, long double *num_iter, int *num_cities, float ***coord, int *mode, int *gendot,
-	      int *threadsPerBlock, int *numBlocks, unsigned int *seed)
+parse_cmdline(int argc, char **argv, long double *num_iter, int *num_cities,
+	      float ***coord, int *mode, int *gendot, int *threadsPerBlock,
+	      int *numBlocks, unsigned int *seed, int * device, struct cudaDeviceProp *devProp)
 {
   char c;
   long double i;
-  int nflag = 0, mflag = 0, fflag = 0, gflag = 0, bflag = 0, tflag = 0, sflag = 0;
+  int nflag = 0, mflag = 0, fflag = 0, gflag = 0, bflag = 0, tflag = 0, sflag = 0, dflag = 0;
   float len = 0, min_len = FLT_MAX;
   FILE *file;
+  int candidate = 0;
+  cudaError_t result = cudaSuccess;
 
 
   // Read and parse command line arguments
   opterr = 0;
-  while ((c = getopt (argc, argv, "n:m:f:b:t:s:gh::")) != -1)
+  while ((c = getopt (argc, argv, "n:m:f:b:t:s:d:gh::")) != -1)
     switch (c)
     {
     case 'n':
@@ -98,10 +101,21 @@ parse_cmdline(int argc, char **argv, long double *num_iter, int *num_cities, flo
       break;
     case 't':
       tflag = 1;
+      candidate = atoi(optarg);
       if (!is_integer (optarg))
       {
-        fprintf (stderr, "%s: error: number of threads per block must be an integer and power of two\n", argv[0]);
+        fprintf (stderr, "%s: error: number of threads per block must be an integer\n", argv[0]);
         exit (EXIT_FAILURE);
+      }
+      else if (candidate <= 0)
+      {
+	fprintf (stderr, "%s: error: number of threads per block must be greater than zero.\n", argv[0]);
+	exit (EXIT_FAILURE);
+      }
+      else if ((candidate & (candidate - 1)) != 0)
+      {
+	fprintf (stderr, "%s: error: number of threads per block must be a power of two(for efficient reduction).\n", argv[0]);
+	exit (EXIT_FAILURE);
       }
       else
       {
@@ -109,15 +123,21 @@ parse_cmdline(int argc, char **argv, long double *num_iter, int *num_cities, flo
       }
       break;
     case 'b':
+      candidate = atoi(optarg);
       bflag = 1;
       if (!is_integer (optarg))
       {
         fprintf (stderr, "%s: error: number of blocks in the grid must be an integer\n", argv[0]);
         exit (EXIT_FAILURE);
       }
+      else if (candidate <= 0)
+      {
+	fprintf(stderr, "%s: error: number of blocks must be greater than zero\n", argv[0]);
+	exit (EXIT_FAILURE);
+      }
       else
       {
-	*numBlocks = strtold (optarg, NULL);
+	*numBlocks = candidate;
       }
       break;
     case 's':
@@ -131,7 +151,17 @@ parse_cmdline(int argc, char **argv, long double *num_iter, int *num_cities, flo
 	{
 	  *seed = strtold (optarg, NULL);
 	}
-	break;	
+	break;
+    case 'd':
+      candidate = atoi(optarg);
+      result = cudaSetDevice(candidate);
+      if (result != cudaSuccess) {
+	fprintf (stderr, "%s: error: invalid device requested\n", argv[0]);
+	exit (EXIT_FAILURE);
+      }
+      *device = candidate;
+      dflag = 1;
+      break;
     case 'h':
       help ();
       exit (EXIT_SUCCESS);
@@ -140,7 +170,7 @@ parse_cmdline(int argc, char **argv, long double *num_iter, int *num_cities, flo
       fprintf (stderr, "%s: error: invalid option\n", argv[0]);
       return 1;
     default:
-      fprintf (stderr, "usage: tsp [-h] [-g] [-n <ITER>] -b <BNUM> -t <TNUM> -m <MODE> -f <FILE>\n");
+      fprintf (stderr, "usage: tsp [-h] [-g] -n <ITER> [-m <MODE>] [-b <BNUM>] [-t <TNUM>] [-d <DEVN>] -f <FILE>\n");
       abort ();
     }
 
@@ -156,70 +186,63 @@ parse_cmdline(int argc, char **argv, long double *num_iter, int *num_cities, flo
     exit (EXIT_FAILURE);
   }
 
-  // Check if obrigatory argumets were given
-  if (nflag == 0 || mflag == 0 || fflag == 0)
+  
+  // Check if obligatory argumets were given
+  if (nflag == 0 || fflag == 0)
   {
     fprintf (stderr, "%s: error: too few parameters\n", argv[0]);
-    fprintf (stderr, "usage: tsp [-h] [-n <ITER>] -b <BNUM> -t <TNUM> -m <MODE> -f <FILE>\n");
+    fprintf (stderr, "usage: tsp [-h] [-g] -n <ITER> [-m <MODE>] [-b <BNUM>] [-t <TNUM>] [-d <DEVN>] -f <FILE>\n");
     exit (EXIT_FAILURE);
   }
-}
 
-void
-setupGPU (unsigned int device, struct cudaDeviceProp *deviceProp, unsigned int *blocksize, unsigned int *gridsize)
-{
+  if(!dflag)
+  {
+    handleCudaErrors (cudaSetDevice(*device));
+  }
     
-  handleCudaErrors (cudaGetDeviceProperties(deviceProp, device));
-
-
-  handleCudaErrors (cudaSetDevice(device));
-
-  if (*blocksize > (unsigned int)deviceProp->maxThreadsDim[0])
+  handleCudaErrors (cudaGetDeviceProperties(devProp, *device));
+  
+  if (*threadsPerBlock > devProp->maxThreadsDim[0])
   {
-    fprintf (stderr, "O número de threads por bloco excede as capacidades do dispositivo");
+    fprintf (stderr, "O número de threads por bloco excede as capacidades do dispositivo\n");
     exit (EXIT_FAILURE);
   }
 
-  if (*gridsize > (unsigned int)deviceProp->maxGridSize[0])
+  if (*numBlocks > devProp->maxGridSize[0])
   {
-    fprintf (stderr, "O número de blocos na grid excede as capacidades do dispositivo");
+    fprintf (stderr, "O número de blocos na grid excede as capacidades do dispositivo\n");
     exit (EXIT_FAILURE);
   }
+  
 }
 
 int
 main (int argc, char **argv)
 {
   long double i, num_iter;
-  int num_cities, mode, gendot = 0, threadsPerBlock = 256, numBlocks = 32;
+  int num_cities, mode = 0, gendot = 0, threadsPerBlock = 64, numBlocks = 16;
   float **coord, **distance;
   int *min_path;
   float len = 0, min_len = FLT_MAX;
   unsigned int rngSeed = time(NULL);
+  int device = 0;
+  struct cudaDeviceProp deviceProp;
+  //Block and grid
+  dim3 block;
+  dim3 grid;
 
   // Parse command line
-  parse_cmdline(argc, argv, &num_iter, &num_cities, &coord, &mode, &gendot, &threadsPerBlock, &numBlocks, &rngSeed);
-
+  parse_cmdline(argc, argv, &num_iter, &num_cities, &coord, &mode, &gendot, &threadsPerBlock, &numBlocks, &rngSeed, &device, &deviceProp);
+  
+  block.x = threadsPerBlock;
+  grid.x = numBlocks;
   StopWatchInterface *timer = NULL;
 
   // Create distance matrix
   distance_matrix (&coord, &distance, num_cities);
 
-  //Hardcoded device for now
-  unsigned int device = 0;
-  
-  //Block and grid
-  dim3 block;
-  dim3 grid;
-  //Hardcoded for now
-  block.x = threadsPerBlock;
-  grid.x = numBlocks;
-
   sdkCreateTimer(&timer);
   sdkStartTimer(&timer);
-  //Initalize device, perform basic checks
-  struct cudaDeviceProp deviceProp;
-  setupGPU (device, &deviceProp, &block.x, &grid.x);
 
   // Allocate memory for RNG states
   curandState *d_rngStates = 0;
