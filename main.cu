@@ -199,7 +199,8 @@ main (int argc, char **argv)
 
   // Parse command line
   parse_cmdline(argc, argv, &num_iter, &num_cities, &coord, &mode, &gendot, &threadsPerBlock, &numBlocks, &rngSeed);
- 
+
+  StopWatchInterface *timer = NULL;
 
   // Create distance matrix
   distance_matrix (&coord, &distance, num_cities);
@@ -214,8 +215,6 @@ main (int argc, char **argv)
   block.x = threadsPerBlock;
   grid.x = numBlocks;
 
-
-  StopWatchInterface *timer = NULL;
   sdkCreateTimer(&timer);
   sdkStartTimer(&timer);
   //Initalize device, perform basic checks
