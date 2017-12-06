@@ -11,6 +11,9 @@ void gen_graphviz (float ** c, int * m, int n) {
     FILE * outfile = fopen("minpath.dot", "w");
 
     fprintf(outfile, "digraph minpath {\n\
+  dpi = 300;\n\
+  node [shape=\"point\", width=0.075];\n\
+  edge [arrowhead=\"none\", penwidth=1];\n\
   overlap=\"scale\";\n\
   splines=\"true\";\n");
 
