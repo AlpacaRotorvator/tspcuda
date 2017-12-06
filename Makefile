@@ -12,7 +12,7 @@ ALL_CFLAGS += $(addprefix -Xcompiler ,$(CFLAGS))
 ALL_LDFLAGS := $(ALL_CFLAGS)
 ALL_LDFLAGS += $(addprefix -Xlinker ,$(LDFLAGS))
 
-INCLUDES  := -I /opt/cuda/samples/common/inc
+INCLUDES  := -I /usr/local/cuda/samples/common/inc
 
 .PHONY: default all clean
 
